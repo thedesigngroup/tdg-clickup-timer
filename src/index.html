@@ -1,0 +1,135 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <title>TDG Timer</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Update banner -->
+    <div id="update" class="banner hidden">
+      <span id="updateText">Update available</span>
+      <button id="updateBtn" class="btn small primary">Install &amp; restart</button>
+    </div>
+
+    <!-- MAIN VIEW -->
+    <section id="viewMain" class="view">
+      <div id="current" class="current idle">
+        <div class="cur-top">
+          <div class="cur-info">
+            <div id="curName" class="cur-name">Not tracking</div>
+            <div id="curPath" class="cur-path">Pick a task below to start</div>
+          </div>
+          <div class="cur-right">
+            <div id="curTime" class="cur-time">0:00:00</div>
+            <button id="stopBtn" class="btn stop hidden" title="Stop timer">Stop</button>
+          </div>
+        </div>
+        <input id="curNote" class="cur-note hidden" placeholder="What are you working on? (optional)" maxlength="300">
+      </div>
+
+      <div class="searchbar">
+        <input id="search" type="search" placeholder="Search tasks…" autocomplete="off" spellcheck="false">
+        <div class="filters">
+          <div class="seg" role="tablist">
+            <button data-scope="mine" class="seg-btn active">Mine</button>
+            <button data-scope="all" class="seg-btn">All</button>
+          </div>
+          <select id="spaceFilter" title="Space">
+            <option value="">All spaces</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="list" class="list"></div>
+
+      <footer class="footer">
+        <span id="status" class="status"></span>
+        <div class="footer-actions">
+          <button id="manualBtn" class="icon-btn" title="Add time manually">＋ Add time</button>
+          <button id="refreshBtn" class="icon-btn" title="Refresh tasks">↻</button>
+          <button id="settingsBtn" class="icon-btn" title="Settings">⚙︎</button>
+        </div>
+      </footer>
+    </section>
+
+    <!-- MANUAL ENTRY VIEW -->
+    <section id="viewManual" class="view hidden">
+      <header class="view-head">
+        <button class="back icon-btn" data-back>‹ Back</button>
+        <h2>Add time</h2>
+      </header>
+      <form id="manualForm" class="form">
+        <label>Task
+          <input id="mTaskSearch" placeholder="Search tasks…" autocomplete="off">
+          <div id="mTaskPick" class="picklist hidden"></div>
+          <div id="mTaskChosen" class="chosen hidden"></div>
+        </label>
+        <div class="row">
+          <label>Date <input id="mDate" type="date" required></label>
+          <label>Start <input id="mStart" type="time"></label>
+        </div>
+        <label>Duration <input id="mDuration" placeholder="e.g. 1h 15m, 1:15, 45m, 1.5h" required></label>
+        <div id="mDurationHint" class="hint"></div>
+        <label>Note <input id="mNote" placeholder="Optional" maxlength="300"></label>
+        <label class="check"><input id="mBillable" type="checkbox"> Billable</label>
+        <div id="mError" class="error hidden"></div>
+        <button type="submit" class="btn primary block">Save to ClickUp</button>
+      </form>
+    </section>
+
+    <!-- IDLE VIEW -->
+    <section id="viewIdle" class="view hidden">
+      <div class="idle-box">
+        <h2>Welcome back</h2>
+        <p id="idleText">You were away.</p>
+        <button id="idleKeep" class="btn block">Keep the time</button>
+        <button id="idleTrimContinue" class="btn primary block">Remove idle time &amp; keep tracking</button>
+        <button id="idleTrimStop" class="btn block">Remove idle time &amp; stop</button>
+      </div>
+    </section>
+
+    <!-- SETTINGS VIEW -->
+    <section id="viewSettings" class="view hidden">
+      <header class="view-head">
+        <button class="back icon-btn" data-back id="settingsBack">‹ Back</button>
+        <h2>Settings</h2>
+      </header>
+      <form id="settingsForm" class="form">
+        <div id="welcome" class="welcome hidden">
+          <strong>Welcome to TDG Timer.</strong>
+          Paste your personal ClickUp API token to get started. In ClickUp: click your avatar → <em>Settings</em> → <em>Apps</em> → <em>API Token</em> → Generate / Copy.
+          <a href="#" id="tokenHelp">Open ClickUp settings</a>
+        </div>
+        <label>ClickUp API token
+          <input id="sToken" type="password" placeholder="pk_…" autocomplete="off" spellcheck="false">
+        </label>
+        <label id="sTeamWrap" class="hidden">Workspace
+          <select id="sTeam"></select>
+        </label>
+        <label>Ask about idle time after
+          <select id="sIdle">
+            <option value="0">Never</option>
+            <option value="5">5 minutes</option>
+            <option value="10">10 minutes</option>
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+          </select>
+        </label>
+        <label class="check"><input id="sBillable" type="checkbox"> New time is billable by default</label>
+        <label class="check"><input id="sLogin" type="checkbox"> Open at login</label>
+        <div id="sError" class="error hidden"></div>
+        <button type="submit" class="btn primary block">Save</button>
+        <div class="settings-foot">
+          <span id="sVersion"></span>
+          <button type="button" id="sCheckUpdate" class="icon-btn">Check for updates</button>
+          <button type="button" id="sQuit" class="icon-btn danger">Quit</button>
+        </div>
+      </form>
+    </section>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
