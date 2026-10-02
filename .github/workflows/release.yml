@@ -1,0 +1,78 @@
+name: Release
+
+# To ship a new version: GitHub → Actions → Release → "Run workflow".
+# Leave the version blank to bump the last number automatically (1.0.3 → 1.0.4).
+# Everyone's app picks the update up within a few hours (or via Settings → Check for updates).
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version (e.g. 1.2.0). Leave blank to auto-bump."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Work out version
+        id: ver
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT: ${{ github.event.inputs.version }}
+        run: |
+          if [ -n "$INPUT" ]; then
+            V="${INPUT#v}"
+          else
+            LAST=$(gh release view --json tagName -q .tagName 2>/dev/null || echo "v0.0.0")
+            LAST="${LAST#v}"
+            IFS=. read -r MA MI PA <<< "$LAST"
+            if [ "$LAST" = "0.0.0" ]; then V=$(node -p "require('./package.json').version"); else V="$MA.$MI.$((PA+1))"; fi
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Building v$V"
+
+      - name: Install
+        run: npm ci
+
+      - name: Set app version
+        run: npm version "${{ steps.ver.outputs.version }}" --no-git-tag-version --allow-same-version
+
+      - name: Make app icon
+        run: |
+          mkdir -p build/icon.iconset
+          for s in 16 32 128 256 512; do
+            sips -z $s $s assets/icon.png --out build/icon.iconset/icon_${s}x${s}.png >/dev/null
+            d=$((s*2)); sips -z $d $d assets/icon.png --out build/icon.iconset/icon_${s}x${s}@2x.png >/dev/null
+          done
+          iconutil -c icns build/icon.iconset -o build/icon.icns
+
+      - name: Package (Apple Silicon + Intel)
+        run: npm run package
+
+      - name: Sign (ad-hoc) and zip
+        run: |
+          APP="dist/TDG Timer-darwin-universal/TDG Timer.app"
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep "$APP"
+          ditto -c -k --keepParent "$APP" TDG-Timer-mac.zip
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.ver.outputs.version }}" TDG-Timer-mac.zip \
+            --title "TDG Timer v${{ steps.ver.outputs.version }}" \
+            --generate-notes \
+            --target "${{ github.sha }}"
