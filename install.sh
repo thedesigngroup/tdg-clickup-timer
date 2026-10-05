@@ -22,4 +22,4 @@ mv "$TMP/out/TDG Timer.app" "$APP"
 xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
 
 open "$APP"
-echo "Done. Look for the stopwatch in your menu bar (top right)."
+echo "Done. TDG Timer is open and in your Applications folder. Right-click its Dock icon → Options → Keep in Dock to pin it."

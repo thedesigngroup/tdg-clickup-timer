@@ -2,7 +2,7 @@
   "name": "tdg-timer",
   "productName": "TDG Timer",
   "version": "1.0.0",
-  "description": "Menu-bar timer that logs time straight to ClickUp tasks",
+  "description": "Mac timer app that logs time straight to ClickUp tasks",
   "main": "src/main.js",
   "author": "The Design Group",
   "license": "UNLICENSED",
@@ -10,7 +10,7 @@
   "updateRepo": "thedesigngroup/tdg-clickup-timer",
   "scripts": {
     "start": "electron .",
-    "package": "electron-packager . \"TDG Timer\" --platform=darwin --arch=universal --out=dist --overwrite --icon=build/icon.icns --app-bundle-id=com.thedesigngroup.tdgtimer --extend-info=assets/Info.extra.plist --ignore=\"^/(dist|build|node_modules|test|\\.github|install\\.sh|README\\.md|\\.gitignore)\""
+    "package": "electron-packager . \"TDG Timer\" --platform=darwin --arch=universal --out=dist --overwrite --icon=build/icon.icns --app-bundle-id=com.thedesigngroup.tdgtimer --ignore=\"^/(dist|build|node_modules|test|\\.github|install\\.sh|README\\.md|\\.gitignore)\""
   },
   "devDependencies": {
     "@electron/packager": "^20.3.0",

@@ -1,8 +1,8 @@
 # TDG Timer
 
-A small Mac menu-bar timer that logs time straight onto ClickUp tasks. It works like TMetric, except the time is saved in ClickUp itself.
+A small Mac app that logs time straight onto ClickUp tasks. It works like TMetric, except the time is saved in ClickUp itself.
 
-- Click the stopwatch in the menu bar, type a few letters, press **Enter** and the timer starts on that task.
+- Open TDG Timer (it sits in your Dock), type a few letters, press **Enter** and the timer starts on that task.
 - Starting another task stops the current one.
 - **＋ Add time** logs time you forgot to track ("1h 15m", "1:15", "45m" or "1.5h").
 - If you walk away while a timer is running, it asks whether to keep or remove that time.
@@ -17,7 +17,7 @@ Open **Terminal** and paste:
 curl -fsSL https://raw.githubusercontent.com/thedesigngroup/tdg-clickup-timer/main/install.sh | bash
 ```
 
-Then click the stopwatch in the menu bar and paste your ClickUp API token. To get it in ClickUp, click your avatar → **Settings** → **Apps** → **API Token** → **Generate**.
+TDG Timer opens by itself. Paste your ClickUp API token. To get it in ClickUp, click your avatar → **Settings** → **Apps** → **API Token** → **Generate**.
 
 Running the same command again reinstalls the latest version.
 
@@ -43,3 +43,4 @@ Each person's app checks for updates every few hours and shows an **Install & re
 - Each person uses their own ClickUp token. It's stored only on their Mac (`~/Library/Application Support/TDG Timer/settings.json`, readable only by them).
 - The app isn't Apple-notarized, which is why it's installed with the Terminal command instead of a download.
 - To run it from source: `npm install` then `npm start`. To run the UI tests: `node test/ui.test.js` (needs Playwright).
+- Close the window and the app keeps running (click the Dock icon to bring it back). Quit with ⌘Q. A running timer shows on the Dock icon and in the window title.
