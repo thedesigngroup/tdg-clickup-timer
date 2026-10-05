@@ -20,7 +20,7 @@ const path = require('path');
       });
       let current = null; window.__calls = [];
       const settings = { token: 'pk_test', idleMinutes: 10, recents: [], favorites: [], version: '1.0.0' };
-      window.tdg = {
+      const bridge = {
         api: async (method, p, body) => {
           window.__calls.push({ method, p, body });
           if (p === '/user') return { ok: true, data: { user: { id: 1, username: 'Chris' } } };
@@ -40,6 +40,8 @@ const path = require('path');
         checkUpdate: async () => ({ available: true, version: 'v1.0.1' }), installUpdate: async () => ({ ok: true }),
         on: (ch, fn) => { (window.__on = window.__on || {})[ch] = fn; },
       };
+      // Mirror Electron's contextBridge: a non-configurable, read-only global.
+      Object.defineProperty(window, 'tdg', { value: bridge, writable: false, configurable: false, enumerable: true });
     });
     await page.goto('file://' + path.resolve(__dirname, '../src/index.html'));
     await page.waitForFunction(() => /tasks/.test(document.getElementById('status').textContent));
