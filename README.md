@@ -4,6 +4,7 @@ A small Mac app that logs time straight onto ClickUp tasks. It works like TMetri
 
 - Open TDG Timer (it sits in your Dock), type a few letters, press **Enter** and the timer starts on that task.
 - Starting another task stops the current one.
+- No task for it yet? Type the name and choose **Create task** (or press ⌘T). Pick the List and it's created in ClickUp, assigned to you, with the timer running.
 - **＋ Add time** logs time you forgot to track ("1h 15m", "1:15", "45m" or "1.5h").
 - If you walk away while a timer is running, it asks whether to keep or remove that time.
 - It stays in sync with ClickUp's own timer, so a timer started in the browser shows up here too.
@@ -35,6 +36,7 @@ Each person's app checks for updates every few hours and shows an **Install & re
 | ↑ / ↓ | Move through tasks |
 | Enter | Start timer on the selected task |
 | Esc | Clear search / close |
+| ⌘T | Create a new task (and start the timer on it) |
 | ⌘N | Add time manually |
 | ⌘, | Settings |
 
