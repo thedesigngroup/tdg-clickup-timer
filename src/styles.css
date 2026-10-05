@@ -144,3 +144,8 @@ input, select, button { font: inherit; color: inherit; }
 .idle-box { padding: 28px 18px; display: flex; flex-direction: column; gap: 10px; }
 .idle-box h2 { margin: 0; font-size: 16px; }
 .idle-box p { margin: 0 0 6px; color: var(--muted); }
+
+/* "Create task" row */
+.task.create { color: var(--accent); }
+.task.create .t-path { color: var(--muted); }
+.task.create .plus { width: 8px; text-align: center; font-weight: 700; flex: none; }

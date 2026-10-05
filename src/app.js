@@ -21,6 +21,7 @@ const state = {
   selected: 0,
   rows: [],            // tasks currently rendered, in order
   manualTask: null,
+  lists: [],           // {id, name, folder, spaceId} for creating tasks
   idle: null,
   update: null,
 };
@@ -90,7 +91,7 @@ function cache(key, value) {
 
 // ---------------- views ----------------
 function show(view) {
-  for (const v of ['viewMain', 'viewManual', 'viewIdle', 'viewSettings']) $(v).classList.toggle('hidden', v !== view);
+  for (const v of ['viewMain', 'viewManual', 'viewCreate', 'viewIdle', 'viewSettings']) $(v).classList.toggle('hidden', v !== view);
   if (view === 'viewMain') setTimeout(() => $('search').focus(), 10);
 }
 
@@ -111,6 +112,7 @@ async function connect() {
     render();
   }
   await Promise.all([loadSpaces(), refreshCurrent()]);
+  loadLists();
   await loadTasks();
 }
 
@@ -125,6 +127,27 @@ async function loadSpaces() {
       .map(([id, name]) => `<option value="${esc(id)}">${esc(name)}</option>`).join('');
   sel.value = state.spaces[keep] ? keep : '';
   state.space = sel.value;
+}
+
+// Every List in the workspace (for "Create task"). Reads folders and
+// folder-less lists in each Space, so new Lists show up automatically.
+async function loadLists() {
+  const out = [];
+  await Promise.all(Object.keys(state.spaces).map(async (sid) => {
+    try {
+      const [f, l] = await Promise.all([
+        api('GET', `/space/${sid}/folder?archived=false`),
+        api('GET', `/space/${sid}/list?archived=false`),
+      ]);
+      for (const li of (l && l.lists) || []) out.push({ id: li.id, name: li.name, folder: '', spaceId: sid });
+      for (const fo of (f && f.folders) || []) {
+        for (const li of fo.lists || []) out.push({ id: li.id, name: li.name, folder: fo.hidden ? '' : fo.name, spaceId: sid });
+      }
+    } catch (e) { /* a Space we can't read; skip it */ }
+  }));
+  const sp = (id) => state.spaces[id] || '';
+  out.sort((a, b) => sp(a.spaceId).localeCompare(sp(b.spaceId)) || a.folder.localeCompare(b.folder) || a.name.localeCompare(b.name));
+  state.lists = out;
 }
 
 function compact(t) {
@@ -347,8 +370,10 @@ function render() {
   state.rows = groups.flatMap((g) => g.rows);
   if (state.selected >= state.rows.length) state.selected = Math.max(0, state.rows.length - 1);
 
+  const createRow = q ? `<div class="task create" data-create="1"><span class="plus">＋</span><div class="t-main"><div class="t-name">Create task “${esc(q)}”</div><div class="t-path">Make it in ClickUp and start the timer</div></div></div>` : '';
+
   if (!state.rows.length) {
-    list.innerHTML = `<div class="empty">${state.tasks.length ? 'No matching tasks.' + (state.scope === 'mine' ? ' Try “All”.' : '') : 'Loading tasks…'}</div>`;
+    list.innerHTML = `<div class="empty">${state.tasks.length ? 'No matching tasks.' + (state.scope === 'mine' ? ' Try “All”, or create it:' : '') : 'Loading tasks…'}</div>` + (state.tasks.length ? createRow : '');
     return;
   }
 
@@ -373,7 +398,7 @@ function render() {
         </div>
       </div>`;
     }).join('')
-  ).join('');
+  ).join('') + createRow;
 }
 
 function moveSelection(delta) {
@@ -382,6 +407,71 @@ function moveSelection(delta) {
   render();
   const el = document.querySelector('.task.selected');
   if (el) el.scrollIntoView({ block: 'nearest' });
+}
+
+// ---------------- create task ----------------
+function openCreate(name) {
+  $('cName').value = name || '';
+  $('cError').classList.add('hidden');
+  const sel = $('cList');
+  if (!state.lists.length) {
+    sel.innerHTML = '<option value="">Loading lists…</option>';
+    loadLists().then(() => fillListSelect());
+  } else fillListSelect();
+  $('cAssign').checked = true;
+  $('cStart').checked = true;
+  show('viewCreate');
+  setTimeout(() => (name ? sel : $('cName')).focus(), 10);
+}
+
+function fillListSelect() {
+  const sel = $('cList');
+  const bySpace = {};
+  for (const l of state.lists) (bySpace[l.spaceId] = bySpace[l.spaceId] || []).push(l);
+  sel.innerHTML = Object.entries(bySpace).map(([sid, ls]) =>
+    `<optgroup label="${esc(state.spaces[sid] || 'Space')}">` +
+    ls.map((l) => `<option value="${esc(l.id)}">${esc(l.folder ? l.folder + ' › ' + l.name : l.name)}</option>`).join('') +
+    '</optgroup>').join('') || '<option value="">No lists found</option>';
+  // Default: the List used last time, else the List of the current/most recent task, else the space filter.
+  const recent = state.taskById.get((state.settings.recents || [])[0]);
+  const pick = [state.settings.lastListId, currentTask() && currentTask().listId, recent && recent.listId]
+    .find((id) => id && state.lists.some((l) => String(l.id) === String(id)));
+  if (pick) sel.value = String(pick);
+  else if (state.space) { const f = state.lists.find((l) => String(l.spaceId) === String(state.space)); if (f) sel.value = String(f.id); }
+}
+
+async function submitCreate(e) {
+  e.preventDefault();
+  const err = $('cError');
+  err.classList.add('hidden');
+  const name = $('cName').value.trim();
+  const listId = $('cList').value;
+  if (!name) { err.textContent = 'Give the task a name.'; err.classList.remove('hidden'); return; }
+  if (!listId) { err.textContent = 'Pick a List.'; err.classList.remove('hidden'); return; }
+  const btn = $('cSubmit');
+  btn.disabled = true;
+  try {
+    const body = { name };
+    if ($('cAssign').checked && state.user) body.assignees = [state.user.id];
+    const t = await api('POST', `/list/${listId}/task`, body);
+    const l = state.lists.find((x) => String(x.id) === String(listId)) || {};
+    const task = { ...compact(t), list: l.name || '', listId, folder: l.folder || '', spaceId: l.spaceId || (t.space && t.space.id) || '' };
+    if (!task.assignees.length && body.assignees) task.assignees = body.assignees;
+    setTasks([task, ...state.tasks]);
+    cache(`tasks:${state.teamId}`, { tasks: state.tasks, spaces: state.spaces });
+    state.settings.lastListId = listId;
+    tdg.setSettings({ lastListId: listId });
+    state.query = '';
+    $('search').value = '';
+    show('viewMain');
+    if ($('cStart').checked) await startTask(task);
+    else { pushRecent(task.id); setStatus(`Created “${task.name}”`); render(); }
+  } catch (ex) {
+    err.textContent = ex.message;
+    err.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // ---------------- manual entry ----------------
@@ -557,7 +647,11 @@ function wire() {
   $('search').addEventListener('keydown', (e) => {
     if (e.key === 'ArrowDown') { e.preventDefault(); moveSelection(1); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); moveSelection(-1); }
-    else if (e.key === 'Enter') { e.preventDefault(); startTask(state.rows[state.selected]); }
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (state.rows.length) startTask(state.rows[state.selected]);
+      else if (state.query.trim() && state.tasks.length) openCreate(state.query.trim());
+    }
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -567,6 +661,7 @@ function wire() {
     }
     if (e.metaKey && e.key === ',') openSettings(false);
     if (e.metaKey && e.key === 'n') openManual(state.rows[state.selected]);
+    if (e.metaKey && e.key === 't' && state.settings.token) openCreate(state.query.trim());
   });
 
   document.querySelectorAll('.seg-btn').forEach((b) => b.addEventListener('click', () => {
@@ -580,6 +675,7 @@ function wire() {
   $('list').addEventListener('click', (e) => {
     const row = e.target.closest('.task');
     if (!row) return;
+    if (row.dataset.create) { openCreate(state.query.trim()); return; }
     const t = state.rows[Number(row.dataset.idx)];
     const act = e.target.closest('[data-act]');
     const a = act ? act.dataset.act : 'start';
@@ -596,6 +692,8 @@ function wire() {
   $('refreshBtn').addEventListener('click', async () => { await loadSpaces().catch(() => {}); await refreshCurrent(); await loadTasks(); });
   $('settingsBtn').addEventListener('click', () => openSettings(false));
   $('manualBtn').addEventListener('click', () => openManual(currentTask()));
+  $('newTaskBtn').addEventListener('click', () => openCreate(state.query.trim()));
+  $('createForm').addEventListener('submit', submitCreate);
   document.querySelectorAll('[data-back]').forEach((b) => b.addEventListener('click', () => show('viewMain')));
 
   // manual entry form

@@ -48,7 +48,8 @@
       <footer class="footer">
         <span id="status" class="status"></span>
         <div class="footer-actions">
-          <button id="manualBtn" class="icon-btn" title="Add time manually">＋ Add time</button>
+          <button id="newTaskBtn" class="icon-btn" title="Create a new ClickUp task (⌘T)">＋ New task</button>
+          <button id="manualBtn" class="icon-btn" title="Add time manually (⌘N)">＋ Add time</button>
           <button id="refreshBtn" class="icon-btn" title="Refresh tasks">↻</button>
           <button id="settingsBtn" class="icon-btn" title="Settings">⚙︎</button>
         </div>
@@ -77,6 +78,22 @@
         <label class="check"><input id="mBillable" type="checkbox"> Billable</label>
         <div id="mError" class="error hidden"></div>
         <button type="submit" class="btn primary block">Save to ClickUp</button>
+      </form>
+    </section>
+
+    <!-- CREATE TASK VIEW -->
+    <section id="viewCreate" class="view hidden">
+      <header class="view-head">
+        <button class="back icon-btn" data-back>‹ Back</button>
+        <h2>New task</h2>
+      </header>
+      <form id="createForm" class="form">
+        <label>Task name <input id="cName" placeholder="What are you working on?" maxlength="500" autocomplete="off"></label>
+        <label>List <select id="cList"></select></label>
+        <label class="check"><input id="cAssign" type="checkbox" checked> Assign to me</label>
+        <label class="check"><input id="cStart" type="checkbox" checked> Start the timer now</label>
+        <div id="cError" class="error hidden"></div>
+        <button type="submit" id="cSubmit" class="btn primary block">Create in ClickUp</button>
       </form>
     </section>
 
