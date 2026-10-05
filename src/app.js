@@ -1,9 +1,9 @@
-// TDG Timer — renderer (UI). Talks to ClickUp only through window.tdg.api,
+// TDG Timer — renderer (UI) for the app window. Talks to ClickUp only through window.tdg.api,
 // which the main process proxies. Nothing here is hard-coded to particular
 // Spaces or Lists: the whole hierarchy is read live from ClickUp.
 
 const $ = (id) => document.getElementById(id);
-const tdg = window.tdg;
+// window.tdg is provided by preload.js (exposed as the global `tdg`).
 
 const state = {
   settings: {},
@@ -562,7 +562,7 @@ function wire() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       if (!$('viewMain').classList.contains('hidden')) {
-        if (state.query) { state.query = ''; $('search').value = ''; render(); } else tdg.hide();
+        if (state.query) { state.query = ''; $('search').value = ''; render(); }
       } else if ($('viewIdle').classList.contains('hidden') && state.settings.token) show('viewMain');
     }
     if (e.metaKey && e.key === ',') openSettings(false);

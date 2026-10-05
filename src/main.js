@@ -1,8 +1,8 @@
 // TDG Timer — main process.
-// Menu-bar app: tray icon + title, a popover window, ClickUp API proxy,
-// idle detection, and self-update from GitHub Releases.
+// Standalone window app (Dock icon), ClickUp API proxy, idle detection,
+// and self-update from GitHub Releases.
 
-const { app, BrowserWindow, Tray, ipcMain, nativeImage, net, powerMonitor, screen, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, nativeTheme, net, powerMonitor, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const updater = require('./updater');
@@ -10,7 +10,6 @@ const updater = require('./updater');
 const API = 'https://api.clickup.com/api/v2';
 const SETTINGS_FILE = () => path.join(app.getPath('userData'), 'settings.json');
 
-let tray = null;
 let win = null;
 let settings = {};
 
@@ -24,21 +23,28 @@ function saveSettings() {
   fs.writeFileSync(SETTINGS_FILE(), JSON.stringify(settings, null, 2), { mode: 0o600 });
 }
 
+function log(line) {
+  const msg = `${new Date().toISOString()} ${line}\n`;
+  if (process.env.TDG_DEBUG) process.stdout.write(msg);
+  try { fs.appendFileSync(path.join(app.getPath('userData'), 'log.txt'), msg); } catch {}
+}
+
 // ---------- window ----------
+// A normal app window with a Dock icon. Closing the window just hides it
+// (the app keeps running so idle detection works); Cmd+Q quits.
+let quitting = false;
 function createWindow() {
+  const b = settings.windowBounds || {};
   win = new BrowserWindow({
-    width: 380,
-    height: 560,
+    width: b.width || 420,
+    height: b.height || 640,
+    x: b.x,
+    y: b.y,
+    minWidth: 360,
+    minHeight: 460,
     show: false,
-    frame: false,
-    resizable: false,
-    movable: false,
-    fullscreenable: false,
-    skipTaskbar: true,
-    alwaysOnTop: true,
-    transparent: true,
-    vibrancy: 'popover',
-    visualEffectState: 'active',
+    title: 'TDG Timer',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e1e20' : '#f6f6f8',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -46,44 +52,38 @@ function createWindow() {
       sandbox: true,
     },
   });
+  // Keep a small log of page errors so problems on someone's Mac can be diagnosed.
+  win.webContents.on('preload-error', (_e, p, err) => log(`preload-error ${p}: ${err && err.stack}`));
+  win.webContents.on('console-message', (e) => {
+    const level = e.level ?? '';
+    if (level === 'error' || level === 'warning' || level === 3 || level === 2) log(`console ${level}: ${e.message} (${e.sourceId}:${e.lineNumber})`);
+  });
+  win.webContents.on('render-process-gone', (_e, d) => log(`renderer gone: ${d.reason}`));
   win.loadFile(path.join(__dirname, 'index.html'));
-  win.on('blur', () => {
-    if (win.webContents.isDevToolsOpened()) return;
-    win.hide();
-    lastHiddenAt = Date.now();
+  win.once('ready-to-show', () => win.show());
+  win.on('focus', () => win.webContents.send('window-shown'));
+  win.on('close', (e) => {
+    settings.windowBounds = win.getBounds();
+    saveSettings();
+    if (!quitting && process.platform === 'darwin') { e.preventDefault(); win.hide(); }
   });
   // Open any links (e.g. "open in ClickUp") in the default browser.
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
 }
 
 function showWindow() {
-  const b = tray.getBounds();
-  const { width, height } = win.getBounds();
-  const display = screen.getDisplayNearestPoint({ x: b.x, y: b.y }).workArea;
-  let x = Math.round(b.x + b.width / 2 - width / 2);
-  x = Math.max(display.x + 8, Math.min(x, display.x + display.width - width - 8));
-  const y = Math.round(b.y + b.height + 4);
-  win.setPosition(x, y, false);
+  if (!win) return;
+  if (win.isMinimized()) win.restore();
   win.show();
   win.focus();
-  win.webContents.send('window-shown');
+  app.focus({ steal: true });
 }
 
-let lastHiddenAt = 0;
-function toggleWindow() {
-  // Clicking the tray icon blurs (and hides) the window first; don't reopen it.
-  if (win.isVisible()) win.hide();
-  else if (Date.now() - lastHiddenAt > 300) showWindow();
-}
-
-// ---------- tray ----------
-function createTray() {
-  const icon = nativeImage.createFromPath(path.join(__dirname, '..', 'assets', 'trayTemplate.png'));
-  icon.setTemplateImage(true);
-  tray = new Tray(icon);
-  tray.setToolTip('TDG Timer');
-  tray.on('click', toggleWindow);
-  tray.on('right-click', toggleWindow);
+// Running time shows in the window title and on the Dock icon.
+function setTimerTitle(t) {
+  if (!win) return;
+  win.setTitle(t ? `TDG Timer — ${t}` : 'TDG Timer');
+  if (app.dock) app.dock.setBadge(t || '');
 }
 
 // ---------- ClickUp API proxy (runs in main to avoid CORS) ----------
@@ -139,9 +139,9 @@ function registerIpc() {
     if ('launchAtLogin' in patch) applyLoginItem();
     return { ...settings, version: app.getVersion() };
   });
-  ipcMain.on('tray:title', (_e, title) => { tray.setTitle(title ? ' ' + title : ''); });
+  ipcMain.on('tray:title', (_e, title) => setTimerTitle(title));
   ipcMain.on('timer:running', (_e, running) => { timerRunning = !!running; });
-  ipcMain.on('window:hide', () => win.hide());
+  ipcMain.on('window:hide', () => win.minimize());
   ipcMain.on('app:quit', () => app.quit());
   ipcMain.on('open:url', (_e, url) => { if (/^https:\/\//.test(url)) shell.openExternal(url); });
   ipcMain.handle('update:check', () => updater.check(app.getVersion(), updateRepo()));
@@ -162,15 +162,13 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.on('second-instance', () => showWindow());
   app.whenReady().then(() => {
-    if (app.dock) app.dock.hide();
     loadSettings();
     applyLoginItem();
     registerIpc();
-    createTray();
     createWindow();
     setInterval(idleTick, 15 * 1000);
-    // Show the window on first run so people can paste their token.
-    if (!settings.token) win.once('ready-to-show', showWindow);
   });
-  app.on('window-all-closed', (e) => e.preventDefault());
+  app.on('activate', () => showWindow());          // clicking the Dock icon
+  app.on('before-quit', () => { quitting = true; });
+  app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 }
