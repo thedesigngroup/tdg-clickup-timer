@@ -26,6 +26,9 @@ const path = require('path');
           if (p === '/user') return { ok: true, data: { user: { id: 1, username: 'Chris' } } };
           if (p === '/team') return { ok: true, data: { teams: [{ id: 123, name: 'TDG' }] } };
           if (p.startsWith('/team/123/space')) return { ok: true, data: { spaces } };
+          if (/^\/space\/s\d\/folder/.test(p)) return { ok: true, data: { folders: [{ id: 'f1', name: 'Active', hidden: false, lists: [{ id: 'l0', name: 'Acme Co' }] }] } };
+          if (/^\/space\/s\d\/list/.test(p)) return { ok: true, data: { lists: [{ id: 'l2', name: 'Ops' }] } };
+          if (method === 'POST' && /^\/list\/.+\/task$/.test(p)) { const t = { id: 'new1', name: body.name, url: 'https://app.clickup.com/t/new1', status: { status: 'to do', color: '#aaa' }, list: { id: p.split('/')[2] }, space: { id: 's1' }, assignees: [], date_updated: String(Date.now()) }; tasks.unshift(t); return { ok: true, data: t }; }
           if (p.startsWith('/team/123/task')) { const pg = +p.match(/page=(\d+)/)[1]; const b = tasks.slice(pg * 100, pg * 100 + 100); return { ok: true, data: { tasks: b, last_page: pg * 100 + 100 >= tasks.length } }; }
           if (p.endsWith('/time_entries/current')) return { ok: true, data: { data: current } };
           if (p.endsWith('/time_entries/start')) { const t = tasks.find((x) => x.id === body.tid); current = { id: 'e1', task: { id: t.id, name: t.name }, start: String(Date.now() - 3723000), duration: -1, description: '' }; return { ok: true, data: { data: current } }; }
@@ -50,7 +53,7 @@ const path = require('path');
     await page.screenshot({ path: `test/shot-${scheme}-main.png` });
 
     await page.fill('#search', 'logo acme');
-    const rows = await page.$$eval('.task .t-name', (els) => els.map((e) => e.textContent));
+    const rows = await page.$$eval('.task:not(.create) .t-name', (els) => els.map((e) => e.textContent));
     ok(`${scheme}: multi-word search`, rows.length > 0 && rows.every((r) => r.startsWith('Logo refresh')));
     await page.press('#search', 'Enter');
     await page.waitForFunction(() => document.getElementById('current').classList.contains('running'));
@@ -89,6 +92,20 @@ const path = require('path');
     await page.click('#manualForm button[type=submit]');
     const m = await page.evaluate(() => window.__calls.find((c) => c.method === 'POST' && c.p.endsWith('/time_entries')));
     ok(`${scheme}: manual entry duration`, m && m.body.duration === 75 * 60000 && new Date(m.body.start).getHours() === 9 && new Date(m.body.start).getMinutes() === 30);
+
+    // create a task in real time
+    await page.fill('#search', 'Brand new client call');
+    ok(`${scheme}: create row offered`, (await page.textContent('#list')).includes('Create task “Brand new client call”'));
+    await page.press('#search', 'Enter');
+    ok(`${scheme}: create view opens`, await page.isVisible('#viewCreate'));
+    ok(`${scheme}: name prefilled`, (await page.inputValue('#cName')) === 'Brand new client call');
+    ok(`${scheme}: list options loaded`, (await page.$$eval('#cList option', (o) => o.length)) >= 2);
+    await page.screenshot({ path: `test/shot-${scheme}-create.png` });
+    await page.click('#cSubmit');
+    await page.waitForFunction(() => document.getElementById('curName').textContent === 'Brand new client call');
+    const cr = await page.evaluate(() => window.__calls.find((c) => c.method === 'POST' && /^\/list\//.test(c.p)));
+    ok(`${scheme}: task created assigned to me`, cr && cr.body.name === 'Brand new client call' && JSON.stringify(cr.body.assignees) === '[1]');
+    ok(`${scheme}: timer running on new task`, (await page.textContent('#curPath')).includes('›'));
 
     // parser
     const pd = await page.evaluate(() => ['1:15', '45m', '1.5h', '2h', '90', '1h15', 'abc'].map(window.__tdgTest.parseDuration));
